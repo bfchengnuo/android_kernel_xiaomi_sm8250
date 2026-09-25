@@ -109,9 +109,32 @@ fi
 
 echo "TARGET_DEVICE: $TARGET_DEVICE"
 
-if [ $KSU_ENABLE -eq 1 ]; then
+if [ "$KSU_ENABLE" -eq 1 ]; then
     echo "KSU is enabled"
-    curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/3d790eaaabe9e7e33d938bbf836e0f247121e79e/kernel/setup.sh" | bash
+
+    RESUKISU_REF="3d790eaaabe9e7e33d938bbf836e0f247121e79e"
+
+    curl -fL \
+        "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/${RESUKISU_REF}/kernel/setup.sh" \
+        -o /tmp/resukisu-setup.sh
+
+    bash /tmp/resukisu-setup.sh "$RESUKISU_REF"
+
+    actual_ref="$(git -C KernelSU rev-parse HEAD)"
+    echo "Expected ReSukiSU revision: ${RESUKISU_REF}"
+    echo "Actual ReSukiSU revision:   ${actual_ref}"
+
+    if [ "$actual_ref" != "$RESUKISU_REF" ]; then
+        echo "ERROR: ReSukiSU revision mismatch"
+        exit 1
+    fi
+
+    if grep -RqsE \
+        'susfs_set_current_proc_no_su|susfs_set_current_proc_umounted_for_zygote_next|susfs_clear_current_proc_no_su|susfs_is_current_proc_no_su' \
+        KernelSU/kernel; then
+        echo "ERROR: pinned ReSukiSU unexpectedly contains newer SUSFS APIs"
+        exit 1
+    fi
 else
     echo "KSU is disabled"
 fi
